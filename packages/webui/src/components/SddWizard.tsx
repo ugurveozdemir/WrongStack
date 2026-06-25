@@ -16,6 +16,7 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { priorityStyle } from '@/lib/sdd-theme';
 import { cn } from '@/lib/utils';
 import { useSddWizardStore, useUIStore } from '@/stores';
+import { EngineGuide } from './EngineGuide';
 import { FallbackEditor } from './FallbackEditor';
 import { ModelPicker } from './ModelPicker';
 import { type FlowTask, SddFlowGraph } from './SddFlowGraph';
@@ -281,6 +282,7 @@ export function SddWizard({ onClose }: { onClose: () => void }): React.ReactElem
               dependency-ordered task graph, then a real multi-agent fleet executes it — watch live
               on the board.
             </p>
+            <EngineGuide className="mt-6" />
           </div>
         ) : (
           // ── Conversation / review ──

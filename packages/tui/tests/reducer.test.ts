@@ -1223,3 +1223,70 @@ describe('autoPhase board reducer', () => {
     expect(active).toEqual([]);
   });
 });
+
+describe('autoPhase phase selection (↑/↓)', () => {
+  const sel = (s: ReturnType<typeof initial>): number | null =>
+    (s as never as { autoPhase: { selectedPhase?: number | null } | null }).autoPhase?.selectedPhase ?? null;
+
+  function openWithPhases(n: number) {
+    let s = initial();
+    for (let i = 1; i <= n; i++) {
+      s = reducer(s, {
+        type: 'autoPhasePhaseUpdate',
+        phaseId: `p${i}`,
+        name: `P${i}`,
+        status: 'running',
+        completedTasks: 0,
+        totalTasks: 1,
+      } as never);
+    }
+    return reducer(s, { type: 'autoPhaseMonitorToggle' }); // open the monitor
+  }
+
+  it('autoPhaseSelectNext highlights the first phase then walks down, clamped', () => {
+    let s = openWithPhases(3);
+    expect(sel(s)).toBeNull();
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    expect(sel(s)).toBe(0);
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    expect(sel(s)).toBe(2);
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    expect(sel(s)).toBe(2); // clamped at the last phase
+  });
+
+  it('autoPhaseSelectPrev walks up and clears the highlight at the first phase', () => {
+    let s = openWithPhases(3);
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    s = reducer(s, { type: 'autoPhaseSelectNext' }); // selected = 1
+    s = reducer(s, { type: 'autoPhaseSelectPrev' });
+    expect(sel(s)).toBe(0);
+    s = reducer(s, { type: 'autoPhaseSelectPrev' });
+    expect(sel(s)).toBeNull();
+    s = reducer(s, { type: 'autoPhaseSelectPrev' });
+    expect(sel(s)).toBeNull(); // no-op
+  });
+
+  it('selection actions are no-ops while the monitor is closed', () => {
+    let s = initial();
+    s = reducer(s, {
+      type: 'autoPhasePhaseUpdate',
+      phaseId: 'p1',
+      name: 'P1',
+      status: 'running',
+      completedTasks: 0,
+      totalTasks: 1,
+    } as never);
+    // monitor still closed
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    expect(sel(s)).toBeNull();
+  });
+
+  it('closing the monitor resets the phase highlight', () => {
+    let s = openWithPhases(2);
+    s = reducer(s, { type: 'autoPhaseSelectNext' });
+    expect(sel(s)).toBe(0);
+    s = reducer(s, { type: 'autoPhaseMonitorToggle' }); // close
+    expect(sel(s)).toBeNull();
+  });
+});

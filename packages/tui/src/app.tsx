@@ -4549,6 +4549,19 @@ export function App({
         return;
       }
     }
+    // While the AutoPhase monitor is open, ↑/↓ move the phase highlight (the
+    // overlay advertises this). Gated like the SDD board keys so they don't
+    // steal the arrows from input-history navigation when the overlay is shut.
+    if (state.autoPhase?.monitorOpen && !key.ctrl && !key.meta) {
+      if (key.downArrow) {
+        dispatch({ type: 'autoPhaseSelectNext' });
+        return;
+      }
+      if (key.upArrow) {
+        dispatch({ type: 'autoPhaseSelectPrev' });
+        return;
+      }
+    }
     // F5 → plan panel overlay. Opening closes any other overlay or panel.
     if (key.fn === 5) {
       if (state.planPanelOpen) {
@@ -6526,6 +6539,7 @@ export function App({
               runningPhaseIds={state.autoPhase.runningPhaseIds}
               elapsedMs={state.autoPhase.elapsedMs}
               nowTick={nowTick}
+              selectedPhase={state.autoPhase.selectedPhase ?? null}
             />
           ) : state.sddBoard?.monitorOpen ? (
             <SddBoardOverlay

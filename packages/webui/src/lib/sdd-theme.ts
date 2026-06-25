@@ -121,6 +121,84 @@ export function statusStyle(s: string): SddStatusStyle {
   return SDD_STATUS[s as SddStatus] ?? SDD_STATUS.pending;
 }
 
+/**
+ * AutoPhase PHASE statuses differ from SDD task statuses — a phase has
+ * ready/paused/skipped that tasks don't, and no queued/blocked/cancelled.
+ * Same SddStatusStyle shape so AutoPhase surfaces share the SDD visual language.
+ */
+export type ApPhaseStatus =
+  | 'pending'
+  | 'ready'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'skipped';
+
+export const AP_PHASE_STATUS: Record<ApPhaseStatus, SddStatusStyle> = {
+  pending: {
+    label: 'Pending',
+    icon: CircleDot,
+    text: 'text-slate-500 dark:text-slate-400',
+    ring: 'border-slate-400/50 bg-slate-400/10 dark:border-slate-600/50 dark:bg-slate-700/20',
+    dot: 'bg-slate-500',
+    hex: '#64748b',
+  },
+  ready: {
+    label: 'Ready',
+    icon: CircleDot,
+    text: 'text-cyan-600 dark:text-cyan-300',
+    ring: 'border-cyan-500/50 bg-cyan-500/10',
+    dot: 'bg-cyan-400',
+    hex: '#22d3ee',
+  },
+  running: {
+    label: 'Running',
+    icon: Loader2,
+    spin: true,
+    text: 'text-amber-600 dark:text-amber-300',
+    ring: 'border-amber-400/60 bg-amber-500/10',
+    dot: 'bg-amber-400',
+    hex: '#fbbf24',
+  },
+  paused: {
+    label: 'Paused',
+    icon: CircleDot,
+    text: 'text-orange-600 dark:text-orange-300',
+    ring: 'border-orange-500/50 bg-orange-500/10',
+    dot: 'bg-orange-400',
+    hex: '#fb923c',
+  },
+  completed: {
+    label: 'Done',
+    icon: Check,
+    text: 'text-emerald-600 dark:text-emerald-300',
+    ring: 'border-emerald-500/55 bg-emerald-500/10',
+    dot: 'bg-emerald-400',
+    hex: '#34d399',
+  },
+  failed: {
+    label: 'Failed',
+    icon: X,
+    text: 'text-red-600 dark:text-red-300',
+    ring: 'border-red-500/60 bg-red-500/10',
+    dot: 'bg-red-400',
+    hex: '#f87171',
+  },
+  skipped: {
+    label: 'Skipped',
+    icon: Ban,
+    text: 'text-slate-500 dark:text-slate-400',
+    ring: 'border-slate-400/50 bg-slate-400/10 dark:border-slate-500/50 dark:bg-slate-600/20',
+    dot: 'bg-slate-500',
+    hex: '#94a3b8',
+  },
+};
+
+export function apPhaseStatusStyle(s: string): SddStatusStyle {
+  return AP_PHASE_STATUS[s as ApPhaseStatus] ?? AP_PHASE_STATUS.pending;
+}
+
 export type SddPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export const SDD_PRIORITY: Record<SddPriority, { text: string; chip: string }> = {

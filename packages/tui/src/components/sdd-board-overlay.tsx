@@ -84,14 +84,59 @@ function TaskCard({ task }: { task: SddBoardTask }): React.ReactElement {
  */
 export function SddBoardOverlay({
   snapshot,
+  focusColumn = null,
 }: {
   snapshot: SddBoardSnapshot;
+  /** Index of the drill-down column, or null for the all-phases view. */
+  focusColumn?: number | null;
 }): React.ReactElement {
   const byShort = new Map<string, SddBoardTask>(snapshot.tasks.map((t) => [t.shortId, t]));
   const p = snapshot.progress;
   const chains = snapshot.diagnostics?.deadlockChains ?? [];
   // Most-recent-first feed; the projector already caps + orders it.
   const recentFeed = (snapshot.feed ?? []).slice(0, 6);
+
+  const focused =
+    focusColumn !== null && focusColumn >= 0 && focusColumn < snapshot.columns.length
+      ? focusColumn
+      : null;
+  // Phase drill-down: render only the focused column, expanded with its own
+  // progress + a wrapping card grid. Mirrors the WebUI PhaseFocusView.
+  if (focused !== null) {
+    const col = snapshot.columns[focused];
+    const tasks = (col?.taskIds ?? [])
+      .map((sid) => byShort.get(sid))
+      .filter((t): t is SddBoardTask => Boolean(t));
+    const done = tasks.filter((t) => t.displayStatus === 'completed').length;
+    const running = tasks.filter((t) => t.displayStatus === 'in_progress');
+    return (
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+        <Box flexDirection="row" gap={1} marginBottom={1}>
+          <Text bold color="cyan">
+            {clip(col?.label ?? 'Phase', 24)}
+          </Text>
+          <Text dimColor>│</Text>
+          <Text dimColor>
+            phase {focused + 1}/{snapshot.columns.length}
+          </Text>
+          <Text dimColor>│</Text>
+          <Text color="green">✓{done}</Text>
+          <Text dimColor>/{tasks.length}</Text>
+          {running.length > 0 ? <Text color="yellow">▶{running.length}</Text> : null}
+          <Text dimColor>│ ←/→ navigate · ← back · Ctrl+B close</Text>
+        </Box>
+        {tasks.length === 0 ? (
+          <Text dimColor>No tasks in this phase.</Text>
+        ) : (
+          <Box flexDirection="row" flexWrap="wrap" gap={1}>
+            {tasks.map((t) => (
+              <TaskCard key={t.id} task={t} />
+            ))}
+          </Box>
+        )}
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
@@ -113,7 +158,7 @@ export function SddBoardOverlay({
         <Text dimColor>({p.percentComplete}%)</Text>
         {p.inProgress > 0 ? <Text color="yellow">▶{p.inProgress}</Text> : null}
         {p.failed > 0 ? <Text color="red">✗{p.failed}</Text> : null}
-        <Text dimColor>│ Ctrl+B close · c clean wt · z rollback</Text>
+        <Text dimColor>│ → focus phase · Ctrl+B close · c clean wt · z rollback</Text>
       </Box>
 
       {/* Deadlock diagnostics */}

@@ -1,50 +1,19 @@
-import { Activity, AlertTriangle, Cpu, Eraser, Pause, Play, RotateCcw, Square, Undo2, X, Zap } from 'lucide-react';
+import { Activity, AlertTriangle, Cpu, Eraser, HelpCircle, Layers, Pause, Play, RotateCcw, Square, Undo2, X, Zap } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useProviderModels } from '@/hooks/useProviderModels';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { agentInitials, fmtDuration, SDD_AGENT_COLORS, SDD_RUN_STATUS } from '@/lib/sdd-theme';
 import { cn } from '@/lib/utils';
 import { type BoardTaskItem, useSddBoardStore } from '@/stores';
+import { EngineGuide } from './EngineGuide';
+import { PhaseFocusView } from './PhaseFocusView';
+import { ProgressRing } from './ProgressRing';
 import { SddActivityFeed } from './SddActivityFeed';
 import { type FlowTask, SddFlowGraph } from './SddFlowGraph';
 import { SddKanbanView } from './SddKanbanView';
 import { SddTaskDrawer } from './SddTaskDrawer';
 import { Button } from './ui/button';
-
-/** Circular progress ring. */
-function ProgressRing({ pct }: { pct: number }): React.ReactElement {
-  const r = 26;
-  const c = 2 * Math.PI * r;
-  const off = c - (Math.max(0, Math.min(100, pct)) / 100) * c;
-  return (
-    <div className="relative h-16 w-16 shrink-0">
-      <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
-        <circle cx="32" cy="32" r={r} fill="none" stroke="hsl(215 28% 22%)" strokeWidth="6" />
-        <circle
-          cx="32"
-          cy="32"
-          r={r}
-          fill="none"
-          stroke="url(#sddgrad)"
-          strokeWidth="6"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={off}
-          style={{ transition: 'stroke-dashoffset 0.6s cubic-bezier(0.16,1,0.3,1)' }}
-        />
-        <defs>
-          <linearGradient id="sddgrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#a78bfa" />
-            <stop offset="100%" stopColor="#22d3ee" />
-          </linearGradient>
-        </defs>
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground">
-        {Math.round(pct)}%
-      </div>
-    </div>
-  );
-}
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from './ui/dialog';
 
 /**
  * SddBoardView — the live multi-agent execution show. Renders the run as an
@@ -57,6 +26,7 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
   const [now, setNow] = useState(() => Date.now());
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'graph' | 'kanban'>('graph');
+  const [focusIdx, setFocusIdx] = useState<number | null>(null);
 
   useEffect(() => {
     client?.send?.({ type: 'sdd.board.get' });
@@ -167,6 +137,16 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
 
   const p = snapshot?.progress;
   const chains = snapshot?.diagnostics?.deadlockChains ?? [];
+
+  // Per-phase drill-down: a topological column (Start / Phase 1 / …) shown on
+  // its own screen. Data comes entirely from the snapshot — no backend call.
+  const columns = snapshot?.columns ?? [];
+  const focusColumn = focusIdx !== null && focusIdx >= 0 && focusIdx < columns.length ? columns[focusIdx] : null;
+  const focusTasks = useMemo(() => {
+    if (!focusColumn) return [];
+    const ids = new Set(focusColumn.taskIds);
+    return flowTasks.filter((t) => ids.has(t.shortId));
+  }, [focusColumn, flowTasks]);
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -282,6 +262,17 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
                 )}
               </>
             )}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" title="AutoPhase vs SDD">
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogTitle className="sr-only">AutoPhase vs SDD Project</DialogTitle>
+                <EngineGuide className="border-0" />
+              </DialogContent>
+            </Dialog>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
@@ -291,7 +282,7 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
         {/* stats + roster */}
         {snapshot && p && (
           <div className="mt-2.5 flex items-center gap-5">
-            <ProgressRing pct={p.percentComplete} />
+            <ProgressRing pct={p.percentComplete} id="sdd-board" />
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3 text-xs">
                 <Stat
@@ -368,43 +359,46 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
         </div>
       )}
 
-      {/* ── Dashboard: animated DAG (left) + side panel (right) ── */}
-      <div className="flex min-h-0 flex-1">
-        <div className="relative min-w-0 flex-1">
-          {!snapshot ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-              <Zap className="h-10 w-10 text-violet-500/40" />
-              <p className="text-foreground">No active SDD run.</p>
-              <p className="max-w-sm text-center text-xs text-muted-foreground">
-                Start one from the <span className="text-violet-400">New SDD Project</span> wizard,
-                or via <code className="rounded bg-muted px-1">/sdd execute</code> in the CLI —
-                agents appear here live, each working an isolated worktree.
-              </p>
-            </div>
-          ) : viewMode === 'graph' ? (
-            <>
-              <SddFlowGraph
-                tasks={flowTasks}
-                columns={snapshot.columns}
-                onTaskClick={onTaskClick}
-              />
-              <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] text-muted-foreground backdrop-blur">
-                click a task for details
-              </div>
-            </>
-          ) : (
-            <SddKanbanView
-              tasks={snapshot.tasks}
-              selectedId={selectedTaskId}
-              onTaskClick={onTaskClick}
-            />
-          )}
+      {/* Phase chips — click a topological column to drill into it. */}
+      {snapshot && columns.length > 0 && !focusColumn && (
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-border px-4 py-1.5 shrink-0">
+          <span className="mr-1 text-[10px] uppercase tracking-wide text-muted-foreground">phases</span>
+          {columns.map((c, i) => (
+            <button
+              key={`${c.label}-${i}`}
+              type="button"
+              onClick={() => setFocusIdx(i)}
+              title={`Focus ${c.label}`}
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:border-violet-500/40 hover:text-foreground"
+            >
+              <Layers className="h-2.5 w-2.5 text-violet-400" />
+              <span className="max-w-[120px] truncate">{c.label}</span>
+              <span className="tabular-nums opacity-70">{c.taskIds.length}</span>
+            </button>
+          ))}
         </div>
+      )}
 
-        {/* Side panel: task detail when one is selected, else the live activity feed. */}
-        {snapshot && (
-          <aside className="w-80 shrink-0 border-l border-border bg-card">
-            {selectedTask ? (
+      {/* ── Dashboard ── */}
+      {focusColumn ? (
+        /* Per-phase drill-down (task drawer overlays when a task is picked). */
+        <div className="relative flex min-h-0 flex-1">
+          <PhaseFocusView
+            label={focusColumn.label}
+            tasks={focusTasks}
+            index={focusIdx as number}
+            total={columns.length}
+            feed={snapshot?.feed ?? []}
+            now={now}
+            prevLabel={focusIdx ? columns[(focusIdx as number) - 1]?.label : undefined}
+            nextLabel={columns[(focusIdx as number) + 1]?.label}
+            onPrev={focusIdx ? () => setFocusIdx((focusIdx as number) - 1) : undefined}
+            onNext={(focusIdx as number) < columns.length - 1 ? () => setFocusIdx((focusIdx as number) + 1) : undefined}
+            onBack={() => setFocusIdx(null)}
+            onTaskClick={onTaskClick}
+          />
+          {selectedTask && snapshot && (
+            <aside className="absolute right-0 top-0 z-10 h-full w-80 border-l border-border bg-card shadow-2xl">
               <SddTaskDrawer
                 key={selectedTask.id}
                 task={selectedTask}
@@ -423,12 +417,66 @@ export function SddBoardView({ onClose }: { onClose: () => void }): React.ReactE
                 onSplit={onSplit}
                 onSelectTask={setSelectedTaskId}
               />
+            </aside>
+          )}
+        </div>
+      ) : (
+        <div className="flex min-h-0 flex-1">
+          <div className="relative min-w-0 flex-1">
+            {!snapshot ? (
+              <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto p-6 text-sm text-muted-foreground">
+                <div className="flex flex-col items-center gap-3">
+                  <Zap className="h-10 w-10 text-violet-500/40" />
+                  <p className="text-foreground">No active SDD run.</p>
+                  <p className="max-w-sm text-center text-xs text-muted-foreground">
+                    Start one from the <span className="text-violet-400">New SDD Project</span> wizard,
+                    or via <code className="rounded bg-muted px-1">/sdd execute</code> in the CLI —
+                    agents appear here live, each working an isolated worktree.
+                  </p>
+                </div>
+                <EngineGuide className="w-full max-w-2xl" />
+              </div>
+            ) : viewMode === 'graph' ? (
+              <>
+                <SddFlowGraph tasks={flowTasks} columns={snapshot.columns} onTaskClick={onTaskClick} />
+                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/40 px-2 py-0.5 text-[10px] text-muted-foreground backdrop-blur">
+                  click a task for details · use the phase chips above to focus a phase
+                </div>
+              </>
             ) : (
-              <SddActivityFeed feed={snapshot.feed ?? []} now={now} />
+              <SddKanbanView tasks={snapshot.tasks} selectedId={selectedTaskId} onTaskClick={onTaskClick} />
             )}
-          </aside>
-        )}
-      </div>
+          </div>
+
+          {/* Side panel: task detail when one is selected, else the live activity feed. */}
+          {snapshot && (
+            <aside className="w-80 shrink-0 border-l border-border bg-card">
+              {selectedTask ? (
+                <SddTaskDrawer
+                  key={selectedTask.id}
+                  task={selectedTask}
+                  allTasks={snapshot.tasks}
+                  feed={snapshot.feed ?? []}
+                  now={now}
+                  modelCandidates={modelCandidates}
+                  defaultModel={snapshot.defaultModel}
+                  onClose={() => setSelectedTaskId(null)}
+                  onRetry={onRetry}
+                  onReassign={onReassign}
+                  onSetModel={onSetModel}
+                  onSetVerification={onSetVerification}
+                  onCancel={onCancel}
+                  onDelete={onDelete}
+                  onSplit={onSplit}
+                  onSelectTask={setSelectedTaskId}
+                />
+              ) : (
+                <SddActivityFeed feed={snapshot.feed ?? []} now={now} />
+              )}
+            </aside>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -521,11 +521,17 @@ export type State = {
     elapsedMs: number;
     /** True while the monitor overlay is open (Ctrl+P). */
     monitorOpen: boolean;
+    /** Index of the highlighted phase row, or null for none. Driven by ↑/↓
+     *  while the monitor is open. */
+    selectedPhase?: number | null;
   } | null;
   /** Live multi-agent SDD board — latest snapshot + overlay open state (Ctrl+B). */
   sddBoard: {
     snapshot: SddBoardSnapshot;
     monitorOpen: boolean;
+    /** Drill-down: index of the focused topological column, or null for the
+     *  all-phases view. Driven by ←/→ while the overlay is open. */
+    focusColumn?: number | null;
   } | null;
   /** Git-worktree isolation state — rendered by WorktreePanel/WorktreeMonitor. */
   worktrees: Record<string, WorktreeRow & { baseBranch?: string | undefined }>;
@@ -934,9 +940,13 @@ export type Action =
       active: boolean;
     }
   | { type: 'autoPhaseMonitorToggle' }
+  | { type: 'autoPhaseSelectNext' }
+  | { type: 'autoPhaseSelectPrev' }
   | { type: 'autoPhaseReset' }
   | { type: 'sddBoardSnapshot'; snapshot: SddBoardSnapshot }
   | { type: 'toggleSddBoardMonitor' }
+  | { type: 'sddBoardFocusNext' }
+  | { type: 'sddBoardFocusPrev' }
   | {
       type: 'worktreeUpsert';
       handleId: string;

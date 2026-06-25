@@ -67,6 +67,16 @@ export function helpSections(): HelpSection[] {
       ],
     },
     {
+      title: 'AutoPhase vs SDD',
+      entries: [
+        { keys: 'AutoPhase', desc: 'goal → auto-planned phases; runs phase-by-phase, per-phase verify+repair' },
+        { keys: 'SDD', desc: 'Q&A → approved spec → dependency DAG; multi-agent fleet, one worktree per task' },
+        { keys: 'Supervisor', desc: 'SDD only: on retry-exhaust → retry / reassign / split / fail + deadlock recovery' },
+        { keys: 'Verify', desc: 'AutoPhase: per-phase typecheck/lint · SDD: per-task gate + re-verify after merge' },
+        { keys: 'Pick', desc: 'AutoPhase = fast autonomous build · SDD = reviewed spec + parallel fleet' },
+      ],
+    },
+    {
       title: 'Tool Colors',
       entries: toolColorLegend(),
     },

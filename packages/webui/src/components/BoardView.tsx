@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useAutoPhaseStore } from '@/stores';
 import { cn } from '@/lib/utils';
@@ -46,6 +46,16 @@ export function BoardView(): React.ReactElement {
   const [layout, setLayout] = useState<BoardLayout>('phase');
   const [dragId, setDragId] = useState<string | null>(null);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
+  // Inline add-task: which phase column has its title input open, and its text.
+  // (No window.prompt — native dialogs are banned in this UI.)
+  const [addingPhaseId, setAddingPhaseId] = useState<string | null>(null);
+  const [addTitle, setAddTitle] = useState('');
+  const addInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus the inline composer when it opens (avoids the autoFocus a11y rule).
+  useEffect(() => {
+    if (addingPhaseId) addInputRef.current?.focus();
+  }, [addingPhaseId]);
 
   const tasks = useMemo<BoardTask[]>(
     () => phases.flatMap((p) => (p.tasks ?? []).map((t) => ({ ...t, phaseId: p.id }))),
@@ -78,12 +88,22 @@ export function BoardView(): React.ReactElement {
       send({ type: 'autophase.assignTask', payload: { taskId, agentName: agentName || undefined } }),
     [send],
   );
-  const onAddTask = useCallback(
+  const openAdd = useCallback((phaseId: string) => {
+    setAddingPhaseId(phaseId);
+    setAddTitle('');
+  }, []);
+  const cancelAdd = useCallback(() => {
+    setAddingPhaseId(null);
+    setAddTitle('');
+  }, []);
+  const submitAdd = useCallback(
     (phaseId: string) => {
-      const title = window.prompt('New task title');
-      if (title?.trim()) send({ type: 'autophase.addTask', payload: { phaseId, title: title.trim() } });
+      const title = addTitle.trim();
+      if (title) send({ type: 'autophase.addTask', payload: { phaseId, title } });
+      setAddingPhaseId(null);
+      setAddTitle('');
     },
-    [send],
+    [addTitle, send],
   );
 
   const dropToPhase = useCallback(
@@ -201,13 +221,29 @@ export function BoardView(): React.ReactElement {
                   </div>
                   <button
                     type="button"
-                    onClick={() => onAddTask(phase.id)}
+                    onClick={() => (addingPhaseId === phase.id ? cancelAdd() : openAdd(phase.id))}
                     title="Add task"
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     <Plus className="h-4 w-4" />
                   </button>
                 </div>
+                {addingPhaseId === phase.id && (
+                  <div className="border-b border-border p-2">
+                    <input
+                      ref={addInputRef}
+                      value={addTitle}
+                      onChange={(e) => setAddTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitAdd(phase.id);
+                        else if (e.key === 'Escape') cancelAdd();
+                      }}
+                      onBlur={() => addTitle.trim() === '' && cancelAdd()}
+                      placeholder="New task title — Enter to add, Esc to cancel"
+                      className="w-full rounded border border-border bg-card px-2 py-1 text-xs outline-none focus:border-primary/50"
+                    />
+                  </div>
+                )}
                 <div className="flex-1 space-y-2 overflow-y-auto p-2">
                   {phaseTasks.length === 0 ? (
                     <p className="px-1 py-4 text-center text-[11px] text-muted-foreground">Drop tasks here</p>

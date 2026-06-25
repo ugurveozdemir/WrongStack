@@ -29,6 +29,8 @@ export interface PhaseMonitorProps {
   elapsedMs: number;
   /** nowTick for elapsed time calculation. */
   nowTick: number;
+  /** Index of the highlighted phase row (↑/↓), or null for none. */
+  selectedPhase?: number | null;
 }
 
 const PHASE_STATUS: Record<string, { icon: string; color: string; label: string }> = {
@@ -59,6 +61,7 @@ export function PhaseMonitor({
   runningPhaseIds,
   elapsedMs,
   nowTick,
+  selectedPhase = null,
 }: PhaseMonitorProps): React.ReactElement {
 
 
@@ -102,13 +105,20 @@ export function PhaseMonitor({
           const progress =
             phase.totalTasks > 0 ? `${phase.completedTasks}/${phase.totalTasks}` : '—';
 
+          const isSelected = i === selectedPhase;
+
           return (
             <Box key={phaseKey} flexDirection="column" marginTop={1}>
               <Box flexDirection="row" gap={1}>
+                <Text color={isSelected ? 'cyan' : 'gray'} bold>
+                  {isSelected ? '▸' : ' '}
+                </Text>
                 <Text color={s.color} bold>
                   {s.icon}
                 </Text>
-                <Text bold>{phase.name}</Text>
+                <Text bold color={isSelected ? 'cyan' : undefined}>
+                  {phase.name}
+                </Text>
                 <Text dimColor>·</Text>
                 <Text color={s.color}>{s.label}</Text>
                 {isRunning ? (

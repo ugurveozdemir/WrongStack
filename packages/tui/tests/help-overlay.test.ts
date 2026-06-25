@@ -8,7 +8,14 @@ const flat = () =>
 describe('helpSections', () => {
   it('always groups the areas in order', () => {
     const titles = helpSections().map((s) => s.title);
-    expect(titles).toEqual(['Navigation', 'Monitors', 'Editing', 'Commands', 'Tool Colors']);
+    expect(titles).toEqual([
+      'Navigation',
+      'Monitors',
+      'Editing',
+      'Commands',
+      'AutoPhase vs SDD',
+      'Tool Colors',
+    ]);
   });
 
   it('always lists the monitor + help keys', () => {
@@ -46,6 +53,15 @@ describe('helpSections', () => {
       keys: 'F12 or /sl',
       desc: 'status line picker (F12 may be host/devtools)',
     });
+  });
+
+  it('explains AutoPhase vs SDD including the supervisor', () => {
+    const section = helpSections().find((s) => s.title === 'AutoPhase vs SDD');
+    expect(section).toBeDefined();
+    const keys = section?.entries.map((e) => e.keys) ?? [];
+    expect(keys).toEqual(['AutoPhase', 'SDD', 'Supervisor', 'Verify', 'Pick']);
+    const supervisor = section?.entries.find((e) => e.keys === 'Supervisor');
+    expect(supervisor?.desc).toMatch(/SDD only/);
   });
 
   it('never produces an empty section', () => {

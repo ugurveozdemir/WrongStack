@@ -27,6 +27,7 @@ import { ThemeProvider, useTheme } from './components/ThemeProvider';
 import { Toaster } from './components/Toaster';
 import { SidePanel } from './components/SidePanel';
 import { WorkspaceDock } from './components/WorkspaceDock';
+import { AutoPhaseSidePanel } from './components/AutoPhaseSidePanel';
 import { AgentsMonitor } from './components/AgentsMonitor';
 import { FleetMonitor } from './components/FleetMonitor';
 import { InspectorPanel } from './components/InspectorPanel';
@@ -440,6 +441,10 @@ function AppInner() {
           </div>
         )}
       </main>
+
+      {/* AutoPhase live panel — right-docked, scrolls internally; shrinks the
+          chat horizontally instead of pushing the transcript off-screen. */}
+      <AutoPhaseSidePanel />
 
       {/* Fleet Monitor sidebar overlay */}
       {fleetMonitorOpen && <FleetMonitor onClose={() => setFleetMonitorOpen(false)} />}

@@ -69,8 +69,8 @@ function closePanels(state: State): PanelResetState {
     statuslinePicker: { ...state.statuslinePicker, open: false },
     projectPicker: { ...state.projectPicker, open: false },
     fKeyPicker: { ...state.fKeyPicker, open: false },
-    autoPhase: state.autoPhase ? { ...state.autoPhase, monitorOpen: false } : state.autoPhase,
-    sddBoard: state.sddBoard ? { ...state.sddBoard, monitorOpen: false } : state.sddBoard,
+    autoPhase: state.autoPhase ? { ...state.autoPhase, monitorOpen: false, selectedPhase: null } : state.autoPhase,
+    sddBoard: state.sddBoard ? { ...state.sddBoard, monitorOpen: false, focusColumn: null } : state.sddBoard,
     worktreeMonitorOpen: false,
     coordinator: { ...state.coordinator, monitorOpen: false },
   };
@@ -1458,9 +1458,27 @@ export function reducer(state: State, action: Action): State {
             autoPhase: { ...state.autoPhase, monitorOpen: true },
           }
         : {
+            // Closing drops the phase highlight so it reopens unselected.
             ...state,
-            autoPhase: { ...state.autoPhase, monitorOpen: false },
+            autoPhase: { ...state.autoPhase, monitorOpen: false, selectedPhase: null },
           };
+    }
+    case 'autoPhaseSelectNext': {
+      // ↓ highlights the first phase, then walks down (clamped to the last).
+      if (!state.autoPhase?.monitorOpen) return state;
+      const n = Object.keys(state.autoPhase.phases).length;
+      if (n === 0) return state;
+      const cur = state.autoPhase.selectedPhase ?? null;
+      const next = cur === null ? 0 : Math.min(cur + 1, n - 1);
+      return { ...state, autoPhase: { ...state.autoPhase, selectedPhase: next } };
+    }
+    case 'autoPhaseSelectPrev': {
+      // ↑ walks up; from the first phase it clears the highlight.
+      if (!state.autoPhase?.monitorOpen) return state;
+      const cur = state.autoPhase.selectedPhase ?? null;
+      if (cur === null) return state;
+      const next = cur <= 0 ? null : cur - 1;
+      return { ...state, autoPhase: { ...state.autoPhase, selectedPhase: next } };
     }
     case 'autoPhaseReset': {
       return { ...state, autoPhase: null };
@@ -1469,7 +1487,13 @@ export function reducer(state: State, action: Action): State {
       // Preserve the overlay's open state across snapshots; default closed on
       // the very first snapshot of a run.
       const monitorOpen = state.sddBoard?.monitorOpen ?? false;
-      return { ...state, sddBoard: { snapshot: action.snapshot, monitorOpen } };
+      // Keep the focused column, but clamp it if the new graph has fewer
+      // columns (a phase could vanish mid-run) — out of range falls back to
+      // the all-phases view.
+      const cols = action.snapshot.columns.length;
+      const prevFocus = state.sddBoard?.focusColumn ?? null;
+      const focusColumn = prevFocus !== null && prevFocus < cols ? prevFocus : null;
+      return { ...state, sddBoard: { snapshot: action.snapshot, monitorOpen, focusColumn } };
     }
     case 'toggleSddBoardMonitor': {
       // Nothing to show until the first snapshot arrives.
@@ -1482,9 +1506,28 @@ export function reducer(state: State, action: Action): State {
             sddBoard: { ...state.sddBoard, monitorOpen: true },
           }
         : {
+            // Closing also drops the phase drill-down so it reopens at the
+            // all-phases view.
             ...state,
-            sddBoard: { ...state.sddBoard, monitorOpen: false },
+            sddBoard: { ...state.sddBoard, monitorOpen: false, focusColumn: null },
           };
+    }
+    case 'sddBoardFocusNext': {
+      // → enters the drill-down at column 0, then advances (clamped to last).
+      if (!state.sddBoard?.monitorOpen) return state;
+      const cols = state.sddBoard.snapshot.columns.length;
+      if (cols === 0) return state;
+      const cur = state.sddBoard.focusColumn ?? null;
+      const next = cur === null ? 0 : Math.min(cur + 1, cols - 1);
+      return { ...state, sddBoard: { ...state.sddBoard, focusColumn: next } };
+    }
+    case 'sddBoardFocusPrev': {
+      // ← steps back; from column 0 it exits the drill-down (all-phases view).
+      if (!state.sddBoard?.monitorOpen) return state;
+      const cur = state.sddBoard.focusColumn ?? null;
+      if (cur === null) return state;
+      const next = cur <= 0 ? null : cur - 1;
+      return { ...state, sddBoard: { ...state.sddBoard, focusColumn: next } };
     }
     case 'worktreeUpsert': {
       const prev = state.worktrees[action.handleId];

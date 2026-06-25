@@ -83,6 +83,10 @@ interface UIState {
   inspectorOpen: boolean;
   /** Active tab inside the bottom inspector panel. */
   inspectorTab: 'fleet' | 'agents';
+  /** Right-docked AutoPhase live panel — slides in from the right edge while a
+   *  phase run is active. Replaces the old top-of-chat dock expansion that
+   *  pushed the transcript off-screen with no scroll. */
+  autoPhasePanelOpen: boolean;
   /** Process Monitor overlay — triggered by /kill slash command. */
   processMonitorOpen: boolean;
   /** Queue Panel overlay — triggered by /queue slash command. */
@@ -160,6 +164,8 @@ interface UIState {
   setInspectorOpen: (open: boolean) => void;
   setInspectorTab: (tab: 'fleet' | 'agents') => void;
   toggleInspector: () => void;
+  setAutoPhasePanelOpen: (open: boolean) => void;
+  toggleAutoPhasePanel: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -195,6 +201,7 @@ export const useUIStore = create<UIState>()(
       agentsMonitorOpen: false,
       inspectorOpen: false,
       inspectorTab: 'fleet',
+      autoPhasePanelOpen: false,
       processMonitorOpen: false,
       queuePanelOpen: false,
       terminalOpen: false,
@@ -283,6 +290,8 @@ export const useUIStore = create<UIState>()(
       setInspectorOpen: (open: boolean) => set({ inspectorOpen: open }),
       setInspectorTab: (tab: 'fleet' | 'agents') => set({ inspectorTab: tab }),
       toggleInspector: () => set((s) => ({ inspectorOpen: !s.inspectorOpen })),
+      setAutoPhasePanelOpen: (open: boolean) => set({ autoPhasePanelOpen: open }),
+      toggleAutoPhasePanel: () => set((s) => ({ autoPhasePanelOpen: !s.autoPhasePanelOpen })),
       setProcessMonitorOpen: (open: boolean) => set({ processMonitorOpen: open }),
       setQueuePanelOpen: (open: boolean) => set({ queuePanelOpen: open }),
       setTerminalOpen: (open: boolean) => set({ terminalOpen: open }),

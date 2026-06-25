@@ -11,10 +11,9 @@
  * their Tasks/Plan/collab WebSocket subscriptions must survive.
  */
 
-import { Bot, GitBranch, ListTodo, Maximize2, Rocket, SlidersHorizontal, Target, Users } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bot, GitBranch, ListTodo, Rocket, SlidersHorizontal, Target, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { useWebSocket } from '@/hooks/useWebSocket';
 import { useGitInfo } from '@/hooks/useGitInfo';
 import {
   useAutoPhaseStore,
@@ -28,8 +27,6 @@ import type { DockSection } from '@/stores/ui-store';
 import { CollabPanel } from './CollabPanel';
 import { FleetPanel } from './FleetPanel';
 import { GoalPanel } from './GoalPanel';
-import { PhasePanel } from './PhasePanel';
-import { Button } from './ui/button';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -120,11 +117,10 @@ function DockChip({
 // ── Dock ──────────────────────────────────────────────────────────────
 
 export function WorkspaceDock({ sessionId }: { sessionId: string }) {
-  const { selectAutoPhase, toggleAutoPhaseAutonomous } = useWebSocket();
-
   const dockSection = useUIStore((s) => s.dockSection);
   const toggleDockSection = useUIStore((s) => s.toggleDockSection);
-  const setCurrentView = useUIStore((s) => s.setCurrentView);
+  const autoPhasePanelOpen = useUIStore((s) => s.autoPhasePanelOpen);
+  const toggleAutoPhasePanel = useUIStore((s) => s.toggleAutoPhasePanel);
   const hiddenChips = useUIStore((s) => s.hiddenChips);
   const toggleChipHidden = useUIStore((s) => s.toggleChipHidden);
   const dockCustomizeOpen = useUIStore((s) => s.dockCustomizeOpen);
@@ -139,16 +135,6 @@ export function WorkspaceDock({ sessionId }: { sessionId: string }) {
 
   const gitInfo = useGitInfo();
 
-  // Handlers for PhasePanel
-  const handlePhaseClick = useCallback(
-    (phaseId: string) => selectAutoPhase(phaseId),
-    [selectAutoPhase],
-  );
-  const handleToggleAutonomous = useCallback(
-    () => toggleAutoPhaseAutonomous(!autoPhase.autonomous),
-    [toggleAutoPhaseAutonomous, autoPhase.autonomous],
-  );
-
   const [worktreeView, setWorktreeView] = useState<'graph' | 'lanes'>('graph');
 
   const fleetTotal = fleetAgents.size;
@@ -160,16 +146,19 @@ export function WorkspaceDock({ sessionId }: { sessionId: string }) {
   const todosActive = todos.some((t) => t.status === 'in_progress');
   const phasesActive = autoPhase.phases.length > 0;
 
-  // Auto-open AutoPhase the moment a run starts (0 → N phases) so progress
-  // is visible without hunting; auto-collapse when it disappears.
+  // Auto-open the right-docked AutoPhase panel the moment a run starts
+  // (0 → N phases) so progress is visible without hunting; auto-close when it
+  // disappears. The panel docks on the right and scrolls internally, so it
+  // never pushes the chat transcript off-screen the way the old inline
+  // expansion did.
   const prevPhaseCount = useRef(autoPhase.phases.length);
   useEffect(() => {
     const ui = useUIStore.getState();
-    if (prevPhaseCount.current === 0 && autoPhase.phases.length > 0 && ui.dockSection === null) {
-      ui.setDockSection('autophase');
+    if (prevPhaseCount.current === 0 && autoPhase.phases.length > 0) {
+      ui.setAutoPhasePanelOpen(true);
     }
-    if (autoPhase.phases.length === 0 && ui.dockSection === 'autophase') {
-      ui.setDockSection(null);
+    if (autoPhase.phases.length === 0) {
+      ui.setAutoPhasePanelOpen(false);
     }
     prevPhaseCount.current = autoPhase.phases.length;
   }, [autoPhase.phases.length]);
@@ -206,9 +195,9 @@ export function WorkspaceDock({ sessionId }: { sessionId: string }) {
             icon={<Rocket className="h-3 w-3" />}
             label="AutoPhase"
             value={`${autoPhase.overallPercent}%`}
-            active={open === 'autophase'}
+            active={autoPhasePanelOpen}
             pulse={autoPhase.activePhaseId != null}
-            onClick={() => toggleDockSection('autophase')}
+            onClick={toggleAutoPhasePanel}
           />
         )}
         {visible.goal && goal && (
@@ -328,32 +317,11 @@ export function WorkspaceDock({ sessionId }: { sessionId: string }) {
         </DropdownMenu>
       </div>
 
-      {/* ── Expanded section — exactly one, or nothing ── */}
+      {/* ── Expanded section — exactly one, or nothing ──
+          AutoPhase intentionally has NO inline expansion here: its live view
+          docks on the right (AutoPhaseSidePanel) so it can scroll without
+          pushing the chat transcript down. The chip toggles that panel. */}
       {open && <div className="border-t border-border/40 pt-2" />}
-      {open === 'autophase' && phasesActive && (
-        <div className="space-y-1.5">
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => setCurrentView('autophase')}
-            >
-              <Maximize2 className="h-3 w-3" />
-              Full view
-            </Button>
-          </div>
-          <PhasePanel
-            phases={autoPhase.phases}
-            activePhaseId={autoPhase.activePhaseId ?? undefined}
-            overallPercent={autoPhase.overallPercent}
-            autonomous={autoPhase.autonomous}
-            onPhaseClick={handlePhaseClick}
-            onToggleAutonomous={handleToggleAutonomous}
-            className="w-72 shrink-0"
-          />
-        </div>
-      )}
       {open === 'goal' && <GoalPanel goal={goal} />}
       {open === 'fleet' && <FleetPanel />}
       {open === 'worktrees' && (
